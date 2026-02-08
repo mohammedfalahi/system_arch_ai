@@ -5,14 +5,21 @@ Provides interface for interacting with AWS Bedrock Claude models.
 
 import boto3
 import json
+import os
 from typing import List, Dict, Optional
 from botocore.exceptions import ClientError, NoCredentialsError
+
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
 
 
 class BedrockClient:
     """Client for interacting with AWS Bedrock Claude models."""
     
-    def __init__(self, region_name: str = "us-east-1"):
+    def __init__(self, region_name: str = None):
         """
         Initialize Bedrock client.
         
@@ -22,16 +29,44 @@ class BedrockClient:
         Raises:
             NoCredentialsError: If AWS credentials are not configured
         """
+        # Try Streamlit secrets first, then environment variables
+        aws_access_key = None
+        aws_secret_key = None
+        region = None
+        
+        if HAS_STREAMLIT:
+            try:
+                aws_access_key = st.secrets.get("AWS_ACCESS_KEY_ID")
+                aws_secret_key = st.secrets.get("AWS_SECRET_ACCESS_KEY")
+                region = st.secrets.get("AWS_DEFAULT_REGION", region_name or "us-east-1")
+            except:
+                pass
+        
+        # Fallback to environment variables
+        if not aws_access_key:
+            aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
+            aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+            region = region_name or os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+        
         try:
-            self.bedrock = boto3.client(
-                service_name="bedrock-runtime",
-                region_name=region_name
-            )
+            if aws_access_key and aws_secret_key:
+                self.bedrock = boto3.client(
+                    service_name="bedrock-runtime",
+                    region_name=region,
+                    aws_access_key_id=aws_access_key,
+                    aws_secret_access_key=aws_secret_key
+                )
+            else:
+                # Use default credentials (IAM role, AWS CLI config)
+                self.bedrock = boto3.client(
+                    service_name="bedrock-runtime",
+                    region_name=region or "us-east-1"
+                )
             self.model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
         except NoCredentialsError:
             raise NoCredentialsError(
                 "AWS credentials not found. Configure credentials via IAM role, "
-                "environment variables, or AWS CLI."
+                "environment variables, or Streamlit secrets."
             )
     
     def call_claude(

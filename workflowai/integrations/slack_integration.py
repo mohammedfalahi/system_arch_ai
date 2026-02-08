@@ -5,6 +5,12 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from dotenv import load_dotenv
 
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
+
 # Load environment variables
 load_dotenv()
 
@@ -22,9 +28,17 @@ class SlackIntegration:
         self.use_mock = use_mock
         
         if not use_mock:
-            self.token = token or os.getenv('SLACK_BOT_TOKEN')
+            # Try Streamlit secrets first, then environment variables
+            if HAS_STREAMLIT:
+                try:
+                    self.token = token or st.secrets.get('SLACK_BOT_TOKEN')
+                except:
+                    self.token = token or os.getenv('SLACK_BOT_TOKEN')
+            else:
+                self.token = token or os.getenv('SLACK_BOT_TOKEN')
+            
             if not self.token:
-                raise ValueError("Slack token required. Set SLACK_BOT_TOKEN env var or pass token parameter.")
+                raise ValueError("Slack token required. Set SLACK_BOT_TOKEN env var or Streamlit secret.")
             self.client = WebClient(token=self.token)
         else:
             self.client = None

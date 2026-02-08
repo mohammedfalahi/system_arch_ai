@@ -6,6 +6,12 @@ from email.mime.multipart import MIMEMultipart
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
+
 # Load environment variables
 load_dotenv()
 
@@ -22,13 +28,26 @@ class EmailIntegration:
         self.use_mock = use_mock
         
         if not use_mock:
-            self.email_address = os.getenv('EMAIL_ADDRESS')
-            self.email_password = os.getenv('EMAIL_PASSWORD')
-            self.smtp_server = os.getenv('EMAIL_SMTP_SERVER', 'smtp.gmail.com')
-            self.smtp_port = int(os.getenv('EMAIL_SMTP_PORT', '587'))
+            # Try Streamlit secrets first, then environment variables
+            if HAS_STREAMLIT:
+                try:
+                    self.email_address = st.secrets.get('EMAIL_ADDRESS')
+                    self.email_password = st.secrets.get('EMAIL_PASSWORD')
+                    self.smtp_server = st.secrets.get('EMAIL_SMTP_SERVER', 'smtp.gmail.com')
+                    self.smtp_port = int(st.secrets.get('EMAIL_SMTP_PORT', '587'))
+                except:
+                    self.email_address = os.getenv('EMAIL_ADDRESS')
+                    self.email_password = os.getenv('EMAIL_PASSWORD')
+                    self.smtp_server = os.getenv('EMAIL_SMTP_SERVER', 'smtp.gmail.com')
+                    self.smtp_port = int(os.getenv('EMAIL_SMTP_PORT', '587'))
+            else:
+                self.email_address = os.getenv('EMAIL_ADDRESS')
+                self.email_password = os.getenv('EMAIL_PASSWORD')
+                self.smtp_server = os.getenv('EMAIL_SMTP_SERVER', 'smtp.gmail.com')
+                self.smtp_port = int(os.getenv('EMAIL_SMTP_PORT', '587'))
             
             if not self.email_address or not self.email_password:
-                raise ValueError("Email credentials required. Set EMAIL_ADDRESS and EMAIL_PASSWORD env vars.")
+                raise ValueError("Email credentials required. Set EMAIL_ADDRESS and EMAIL_PASSWORD env vars or Streamlit secrets.")
     
     def send_email(self, 
                    to: str, 
